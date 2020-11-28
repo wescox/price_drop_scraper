@@ -11,6 +11,7 @@ sudo python3 -m smtpd -c DebuggingServer -n localhost:1025
 python -m smtpd -c DebuggingServer -n localhost:1025
 
 ## Dependencies
+pip install requests\
 pip install requests-html\
 pip install pyppdf\
 pip install bs4

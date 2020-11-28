@@ -4,6 +4,10 @@
 #https://www.target.com/p/delta-children-adley-3-in-1-convertible-crib/-/A-53618889?preselect=75003678#lnk=sametab
 #https://www.amazon.com/eufy-Security-Monitor-Display-Wide-Angle-dp-B07YD8W5B9/dp/B07YD8W5B9/ref=dp_ob_title_baby
 
+# #html = soup.prettify("utf-8")
+# # with open("output2.html", "wb") as file:
+# #     file.write(html)
+
 # # print trackers to screen - add to interface
 # retailer_count = 0
 # tmp_list = []
@@ -20,13 +24,13 @@
 # #del data[tmp_list[1]][2]
 
 # TODO: add regex for retailer in scrape
-# TODO: add header rotator to get_session
 
 # libraries
 import smtplib
 import json
 import time
 import random
+import requests
 from requests_html import HTMLSession
 from pyppdf import patch_pyppeteer #only needed for Mac
 from bs4 import BeautifulSoup
@@ -50,7 +54,7 @@ def send_mail():
         print("Error: unable to send email")
 
 
-# open fake browser session
+# open spoof browser session
 def get_session(url):
     if "target.com" in url:
         s = HTMLSession()
@@ -59,33 +63,38 @@ def get_session(url):
     else:
         with open('headers.json') as f:
             data = json.load(f)
+        headers_list = list(data.keys())
+        header = data[random.choice(headers_list)]
         r = requests.Session()
-        request = r.get(url, headers = headers)
+        response = r.get(url, headers = header)
         page = BeautifulSoup(response.content, 'html.parser')
     return page
 
         
 # web scraper
 def scrape(url):
+    print("\nProcessing...\n")
     page = get_session(url)
+    price = ''
     dict = {'title': '', 'price': '', 'url': url}
     if "target.com" in url:
         price = page.html.xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]', first = True).text.strip()
         dict['title'] = page.html.xpath('/html/body/div[1]/div/div[5]/div/div[1]/div[2]/h1/span', first = True).text.strip()
-        retailer = 'target'
+        retailer = 'target.com'
     elif "amazon.com" in url:
         try:
             price = page.find(id="priceblock_ourprice").get_text() # regular price
         except:
             price = page.find(id="priceblock_dealprice").get_text() # sale price
-        dict['title'] = page.find(id="priceblock_dealprice").get_text().strip()
-        retailer = 'amazon'
+        dict['title'] = page.find(id="productTitle").get_text().strip()
+        retailer = 'amazon.com'
     elif "bestbuy.com" in url:
-        price = soup.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
-        retailer = 'best buy'
+        price = page.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
+        dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
+        retailer = 'bestbuy.com'
     dict['price'] = float(price[1:])
     update_json(dict, retailer)
-    print("{} tracker successfully added".format(retailer.capitalize()))
+    print("{} tracker successfully added".format(retailer))
 
 
 # update json file
@@ -100,7 +109,7 @@ def update_json(dict, retailer, file = 'tracker.json'):
 
 if __name__ == '__main__':
     #initialize json file
-    retailers_dict = {'amazon':[], 'target':[], 'best buy': []}
+    retailers_dict = {'amazon.com':[], 'target.com':[], 'bestbuy.com': []}
     try:
         with open('tracker.json') as file:
             pass
@@ -129,28 +138,8 @@ When you're finished entering URLs, type 'q' and press return to exit.
         if url.lower() in ('q', 'quit', 'exit', 'stop'):
             break
         else:
-            print("\nProcessing...\n")
-            scrape(url)
-
-
-
-# # Create ordered dict from Headers above
-# # ordered_headers_list = []
-# # for headers in headers_list:
-# #     h = OrderedDict()
-# #     for header,value in headers.items():
-# #         h[header]=value
-# #     ordered_headers_list.append(h)
-
-# # for i in range(1,4):
-# #Pick a random browser headers
-# headers = headers_list[0]
-# #Create a request session
-# r = requests.Session()
-# r.headers = headers
-# response = r.get(url)
-# soup = BeautifulSoup(response.content, 'html.parser')
-# #html = soup.prettify("utf-8")
-# # with open("output2.html", "wb") as file:
-# #     file.write(html)
-# #price = soup.find(id="priceblock_ourprice").get_text()
+            try:
+            #if any([i in url for i in list(retailers_dict.keys())]):
+                scrape(url)
+            except:
+                print("\nERROR: That's not a compatible URL.")
