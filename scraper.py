@@ -1,36 +1,18 @@
-# must start a local debugging smtp server by executing the below command in a terminal shell
-# sudo python3 -m smtpd -c DebuggingServer -n localhost:1025
-
-#https://www.target.com/p/delta-children-adley-3-in-1-convertible-crib/-/A-53618889?preselect=75003678#lnk=sametab
-#https://www.amazon.com/eufy-Security-Monitor-Display-Wide-Angle-dp-B07YD8W5B9/dp/B07YD8W5B9/ref=dp_ob_title_baby
-
 # #html = soup.prettify("utf-8")
 # # with open("output2.html", "wb") as file:
 # #     file.write(html)
 
-# # print trackers to screen - add to interface
-# retailer_count = 0
-# tmp_list = []
-# for retailer in data:
-#     retailer_count += 1
-#     tmp_list.append(retailer)
-#     print(retailer_count, ': ', retailer.capitalize(), ':', sep= '')
-#     tracker_count = 0
-#     for key in data[retailer]:
-#         tracker_count += 1
-#         print('\t', tracker_count, ': ', key['title'], sep= '')
-#         print('\t  ', key['price'])
-
-# #del data[tmp_list[1]][2]
-
 # TODO: add regex for retailer in scrape
+# TODO: make help interactive
 
 # libraries
 import smtplib
 import json
-import time
-import random
+#import time
 import requests
+from random import choice
+from sys import exit
+from os import system
 from requests_html import HTMLSession
 from pyppdf import patch_pyppeteer #only needed for Mac
 from bs4 import BeautifulSoup
@@ -61,21 +43,25 @@ def get_session(url):
         page = s.get(url)
         page.html.render(sleep=1)
     else:
-        with open('headers.json') as f:
-            data = json.load(f)
-        headers_list = list(data.keys())
-        header = data[random.choice(headers_list)]
+        with open('headers.json') as file:
+            data = json.load(file)
+        header = data[choice(list(data.keys()))]
         r = requests.Session()
         response = r.get(url, headers = header)
-        page = BeautifulSoup(response.content, 'html.parser')
+        page = BeautifulSoup(response.content, 'lxml')
     return page
+
+
+# update json file
+def update_json(trackers, file = 'tracker.json'):
+    with open(file, 'w') as f:
+        json.dump(trackers, f, indent = 4)
 
         
 # web scraper
 def scrape(url):
     print("\nProcessing...\n")
     page = get_session(url)
-    price = ''
     dict = {'title': '', 'price': '', 'url': url}
     if "target.com" in url:
         price = page.html.xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]', first = True).text.strip()
@@ -85,7 +71,7 @@ def scrape(url):
         try:
             price = page.find(id="priceblock_ourprice").get_text() # regular price
         except:
-            price = page.find(id="priceblock_dealprice").get_text() # sale price
+             price = page.find(id="priceblock_dealprice").get_text() # sale price
         dict['title'] = page.find(id="productTitle").get_text().strip()
         retailer = 'amazon.com'
     elif "bestbuy.com" in url:
@@ -93,53 +79,134 @@ def scrape(url):
         dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
         retailer = 'bestbuy.com'
     dict['price'] = float(price[1:])
-    update_json(dict, retailer)
-    print("{} tracker successfully added".format(retailer))
+    trackers[retailer].append(dict)
+    update_json(trackers)
+    print("{} tracker successfully added\n".format(retailer))
 
 
-# update json file
-def update_json(dict, retailer, file = 'tracker.json'):
-    with open(file) as f:
-        data = json.load(f)
-    tmp = data[retailer]
-    tmp.append(dict)
-    with open(file, 'w') as f:
-        json.dump(data, f, indent = 4)
+# check if user input is an app command
+def menu_option(ui, active = False):
+    if ui.lower() == 'q':
+        exit()
+    elif ui.lower() == 'h':
+        #menu_help()
+        pass
+    elif ui.lower() == 'p':
+        menu_addproduct()
+    elif ui.lower() in ('v', 'r'):
+        menu_removeproduct()
+    else:
+        if active:
+            return
+        else:
+            print("\nInvalid command.")
+            ui = input("\nWhat would you like to do:\n")
+            menu_option(ui)
 
+
+# welcome interface
+def welcome():
+    system('clear')
+    print("Price Drop Scraper will monitor the price of chosen products from popular retailers and email you if the price drops.\n\nYou can track products from these online retailers: Amazon, Target, Best Buy\n")
+    print(commands)
+    ui = input("What would you like to do:\n")
+    menu_option(ui)
+
+
+# interface for adding products to json
+def menu_addproduct():
+    system('clear')
+    while True:
+        print(commands)
+        ui = input("Copy/paste the complete URL from a product page you want to track or enter a command:\n")
+        menu_option(ui, True)
+        try:
+            scrape(ui)
+        except:
+            print("\nERROR: Incompatible URL or invalid command.\nRemember you can only track from Amazon, Target, and Best Buy.\nAmazon doesn't like scrapers and may have blocked your attempt.\nTry again.\n")
+
+
+# interface for removing products from json
+def menu_removeproduct():
+    system('clear')
+    while True:
+        count = 0
+        tmp_list = []
+        for retailer in trackers:
+            tracker_count = 0
+            print(retailer + ':')
+            for key in trackers[retailer]:
+                count += 1
+                tmp_list.append([retailer, key['title'], tracker_count])
+                tracker_count += 1
+                print('\t', count, ': ', key['title'], sep= '')
+                print('\t  ', key['price'])
+        print('\n' + commands)
+        ui = input("Type the corresponding number to remove an item or enter a command:\n")
+        menu_option(ui, True)
+        try:
+            ui = int(ui)
+            if ui < 1:
+                raise Exception
+            product = tmp_list[ui-1][1]
+        except:
+            print("\nERROR: Invalid number or command.\n")
+            continue
+        sure = input("\nAre you sure you want to delete {}? (y/n):\n".format(product))
+        if sure.lower() == 'y':
+            del trackers[tmp_list[ui-1][0]][tmp_list[ui-1][2]]
+            update_json(trackers)
+            print("\nProduct successfully removed.\n")
+        elif sure.lower() == 'n':
+            print('\nOkay! Try again!\n')
+        else:
+            menu_option(sure, True)
+            print('\nERROR: Invalid command.\n')
+            
 
 if __name__ == '__main__':
-    #initialize json file
-    retailers_dict = {'amazon.com':[], 'target.com':[], 'bestbuy.com': []}
+# initialize json file
+    trackers = {'amazon.com':[], 'target.com':[], 'bestbuy.com': []}
     try:
         with open('tracker.json') as file:
-            pass
+            trackers = json.load(file)
     except:
-        with open('tracker.json', 'w') as file:
-            json.dump(retailers_dict, file, indent = 4)
-
-    # user interface
-    print(
+        update_json(trackers)
+# initialize interface
+    commands = """********************
+COMMANDS:
+p: Add products
+v: View products
+r: Remove products
+t: Track price
+e: Email testing
+h: Help
+q: Quit app
+********************
 """
+    if any([len(trackers[i]) > 0 in trackers[i] for i in trackers]):
+        #menu_tracker()
+        welcome()
+    else:
+        welcome()
 
-Make sure to run the command below in a separate terminal window to initiate a debugging SMTP server:
-python3 -m smtpd -c DebuggingServer -n localhost:1025 (you'll need to use sudo on Mac or Linux)
 
-You can track products from these retailers:
-Amazon
-Target
-Best Buy
+# You must press the enter/return key to execute any commands or user inputs.  
 
-When you're finished entering URLs, type 'q' and press return to exit. 
-"""
-    )
-    url = ''
-    while True:
-        url = input("\nWhat's the URL of the product you want to track?\n")
-        if url.lower() in ('q', 'quit', 'exit', 'stop'):
-            break
-        else:
-            try:
-            #if any([i in url for i in list(retailers_dict.keys())]):
-                scrape(url)
-            except:
-                print("\nERROR: That's not a compatible URL.")
+# This page will print the first time you launch the app.  To see it again just type 'h' or 'help' and then press the enter/return key
+
+# Add products mode allows you to input the URLs of products you want to track.  To enter this mode type 'p'.
+
+# Remove products mode allows you to remove previously added products you no longer want to track.  Type 'r' to enter this mode.
+
+# Track price mode scrapes your product URLs twice daily and will email you if a price drops.
+# This is the default mode once products have been added.  This app has to be open and running 24/7 if this mode is active.
+# To manually enter this mode after edits type 't'
+
+# Email testing mode allows you to test that emails are working correctly by manually overriding a product price with a higher price.  
+# The app will think the price has dropped and send an email.  Once you exit, the product will reset to originally recorded price.
+# A local SMTP server must be running to test this feature.  Copy/paste the command below in a seperate terminal/command prompt session.  
+
+# python3 -m smtpd -c DebuggingServer -n localhost:1025 (you'll need to use sudo on Mac or Linux)
+
+# To quit the app completely from any screen type 'q'.
