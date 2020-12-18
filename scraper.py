@@ -4,11 +4,10 @@ import json
 import time
 import requests
 import re
+import os
 from random import choice
-from os import system
-from requests_html import HTMLSession
-from pyppdf import patch_pyppeteer #only needed for Mac
 from bs4 import BeautifulSoup
+from selenium import webdriver
 
 
 # notification email
@@ -38,23 +37,24 @@ def update_json(trackers, file = 'tracker.json'):
 
 # spoof browser session
 def get_session(url):
-    if "target.com" in url: # target.com is rendered with javascript so it requires a different method for scraping.
-        s = HTMLSession()
-        page = s.get(url)
-        page.html.render(sleep=1)
-    else:
+    if "bestbuy.com" in url: # beautifulsoup is faster and headless so I prefer this method for compatible websites
         with open('headers.json') as file:
             data = json.load(file)
-        header = data[choice(list(data.keys()))] # random header picker
+        header = data[choice(list(data.keys()))] # random header picker -- originally used to circumvent amazon blocking, but that no longer works so I switched to Selenium
         r = requests.Session()
         response = r.get(url, headers = header)
         page = BeautifulSoup(response.content, 'lxml')
+    else: # selenium is used for target and amazon
+        if os.name == 'posix':
+            PATH = os.getcwd() + '/chromedriver'
+        page = webdriver.Chrome(PATH)
+        page.get(url)
     return page
 
 
 # builds the different messages printed to screen for each command
 def start_msg(command, message, quit = False):
-    system('clear')
+    os.system('clear')
     c = command
     m = message   
     arrow_a = ''
@@ -80,7 +80,8 @@ def start_msg(command, message, quit = False):
             if c == 't':
                 print(
                     "\n///// IMPORTANT ////////////////\n"
-                    "    The intent of this command is to check all saved product pages every 43200 seconds (12 hours), compare saved price with current price, and send an email if the price has dropped.\n"
+                    "    The intent of this command is to check all saved product pages every 43200 seconds (12 hours),\n"
+                    "    compare saved price with current price, and send an email if the price has dropped.\n"
                     "    However, this is a proof-of-concept demonstration.  This app is not currently setup to actually track persistently or send emails.\n"
                     "    This command simply allows testing of those functions.  Type h and press enter/return for more details.\n"
                 )
@@ -115,13 +116,16 @@ def scrape(url, update = True):
         dict = {'title': '', 'price': '', 'url': url}
         try:
             if "target.com" in url:
-                price = page.html.xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]', first = True).text.strip()
-                dict['title'] = page.html.xpath('/html/body/div[1]/div/div[5]/div/div[1]/div[2]/h1/span', first = True).text.strip()
+                price = page.find_element_by_xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]').text
+                dict['title'] = page.title
+                page.quit()
             elif "amazon.com" in url:
-                price = page.find(id="priceblock_ourprice").get_text() # regular price
-                if price == None: # if regular price fails, try sale price
-                    price = page.find(id="priceblock_dealprice").get_text() # sale price
-                dict['title'] = page.find(id="productTitle").get_text().strip()
+                try:
+                    price = page.find_element_by_id("priceblock_ourprice").text
+                except:
+                    price = page.find_element_by_id("priceblock_dealprice").text
+                dict['title'] = page.title
+                page.quit()
             elif "bestbuy.com" in url:
                 price = page.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
                 dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
@@ -185,23 +189,23 @@ def view(ui):
         title = tracker_list[ui-1][1]
     except:
         m =  error_header + "    Not a valid command or number option. Type h(v) and press enter/return for more details.\n"
-        error = True
-    if not error:
+        # error = True
+    # if not error:
+    else:
         sure = input("\nAre you sure you want to delete {}? (y/n):\n".format(title)).lower()
         if sure == 'y': # delete tracker and update json
             del trackers[tracker_list[ui-1][0]][tracker_list[ui-1][4]]
             update_json(trackers)
             m = success_header + "    Product successfully removed.\n"
-        elif sure == 'n':
-            m = alert_header + '    No products were removed.\n'
         else:
-            m = error_header + '    Choose yes or no. Type the letter y or the letter n and press enter/return.  No other commands or input are valid.\n'
+            m = alert_header + '    No products were removed.\n'
     return m
 
 
 # checks to see if user input is a command rather than an option
 def command_menu(ui, command):
-    h = re.search("^h\((.*)\)$",ui) 
+    ui = ui.lower()
+    h = re.search("^h\((.*)\)$", ui) 
     if ui == 'h':
         r = help(command, True)
     elif h:
@@ -235,10 +239,10 @@ def list_trackers(command):
         m = "\n///// TRACKED PRODUCTS //////////\n" + m
     if c == 't':
         m = (
-            "\n///// TRACKED PRODUCT SAMPLE ////\n" + '    ' +
+            "///// TRACKED PRODUCT SAMPLE ////\n" + '    ' +
             tracker_list[0][1] + '\n' +
             "    $" + '{:.2f}'.format(tracker_list[0][2]) +
-            "\n///// PRICE OVERRIDE ////////////\n" +
+            "\n\n///// PRICE OVERRIDE ////////////\n" +
             "    $" + '{:.2f}'.format(tracker_list[0][2] + 10) + '\n'
         )
     return m        
@@ -278,11 +282,11 @@ def commands(command, message = ''):
         while True:
             c = start_msg(c, m) # checks if any trackers are saved, resets c if not,  and prints appropriate messages to the screen.
             if c == 'a':    # different inputs for each command
-                ui = input("Copy/paste the complete URL from a product page to track or enter a command: ").lower()
+                ui = input("Copy/paste the complete URL from a product page to track or enter a command: ")
             if c == 'v':
-                ui = input("Type the corresponding number to remove an item or enter a command: ").lower()
+                ui = input("Type the corresponding number to remove an item or enter a command: ")
             if c == 't':
-                ui = input('Are you ready to test tracker and email? (y/n): ').lower()
+                ui = input('Are you ready to test tracker and email? (y/n): ')
             r = command_menu(ui, c) # check if input is an attempt to change commands, get help, or argument for current command.
             if r == 'option': # this means the input was not a help request or different command so it might be a valid option or argument for this command's functions.
                 if c == 'a':
@@ -292,7 +296,7 @@ def commands(command, message = ''):
                 if c == 't':
                     m = tracker(ui) # picks 1 product from tracker.json, overrides the price with higher amount, scrapes webpage again, checks if price is lower, and sends test email if it is.
             elif r == 'command': 
-                c = ui
+                c = ui.lower()
                 m = ''
             else: # this means input was help request and simply prints that data to screen.  
                 m = r
