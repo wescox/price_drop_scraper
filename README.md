@@ -2,19 +2,20 @@
 Allows user to input the URL of a product page from Amazon, Target, or Best Buy.  The intent is for the app to check the price of each product twice daily and email if the price drops.  However, it's currently designed only for demonstration/testing.  The app does not actually email, or periodically check saved URLs, but you can test both features.  
 
 ## Debugging SMTP server
-The app is configured to use Python's built-in SMTP server which just prints the email components to the screen.  Copy the code below and paste and execute in a separate shell.  If you do not, the app is still fully functional, but there will be no test emails printed to screen.\
-\python3 -m smtpd -c DebuggingServer -n localhost:1025
+The app is configured to use Python's built-in SMTP server which just prints the email components to the screen.  Copy the code below and paste and execute in a separate shell.  If you do not, the app is still fully functional, but there will be no test emails printed to screen.
+
+python3 -m smtpd -c DebuggingServer -n localhost:1025
 
 ## Dependencies
 pip install requests\
 pip install selenium\
-pip install bs4\
+pip install bs4
 
-\App also assumes that Google Chrome is installed in the default application directory for your operating system.  The Chrome webdriver must be downloaded and stored within the same directory as scraper.py.  The webdriver is required for Selenium and for scraping of Amazon and Target's websites.  Go to the link below, download whichever webdriver is compatible with your version of Chrome and OS, unzip the download, then move the 'chromedriver' file to scraper.py's directory.\
+App also assumes that Google Chrome is installed in the default application directory for your operating system.  The Chrome webdriver must be downloaded and stored within the same directory as scraper.py.  The webdriver is required for Selenium and for scraping of Amazon and Target's websites.  Go to the link below, download whichever webdriver is compatible with your version of Chrome and OS, unzip the download, then move the 'chromedriver' file to scraper.py's directory.
 
-\https://sites.google.com/a/chromium.org/chromedriver/home\
+https://sites.google.com/a/chromium.org/chromedriver/home
 
-\The app also uses BeautifulSoup for Best Buy's website.  If there is any issue setting up Selenium, or you don't care for Amazon or Target, app will still be fully functional for bestbuy.com products. 
+The app also uses BeautifulSoup for Best Buy's website.  If there is any issue setting up Selenium, or you don't care for Amazon or Target, app will still be fully functional for bestbuy.com products. 
 
 ## Required Features List
 1. Implement a “master loop” console application where the user can repeatedly enter commands/perform actions, including choosing to exit the program
@@ -27,6 +28,7 @@ pip install bs4\
     - There are many functions, all of which return a value used elsewhere.  
 5. Calculate and display data based on an external factor (ex: get the current date, and display how many days remaining until some event)
     - App compares current external price to previously stored prices at certain times of day
+    - Information about the user's operating system and current working directory is used as well
 6. Implement a “scraper” that can be fed a type of file or URL and pull information off of it. For example, a web scraper that lets you provide any website URL and it will
  find certain keywords on the page
     -  App pulls title and price from product page URLs on Amazon, Target, and Best Buy websites.  
