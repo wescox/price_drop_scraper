@@ -1,5 +1,5 @@
 # Price Drop Scraper
-Allows user to input the URL of a product page from Amazon, Target, or Best Buy, then page will be scraped to pull title and price information.  Products details are stored in a new "tracker.json" file created by the app in the working directory.  The intent is for the app to check the price of each product saved in the "tracker.json" file twice daily and email if the price drops.  However, it's currently designed only for demonstration/testing.  The app does not actually email, or periodically check saved URLs, but you can test both features.  
+Allows user to input the URL of a product page from Amazon, Target, or Best Buy, then page will be scraped to pull title and price information.  Product details are stored in a new "tracker.json" file created by the app in the working directory.  The intent is for the app to check the price of each product saved in the "tracker.json" file twice daily and email if the price drops.  However, it's currently designed only for demonstration/testing.  The app does not actually email, or periodically check saved URLs, but you can test both features.  
 
 ## Debugging SMTP server
 The app is configured to use Python's built-in SMTP server which just prints the email components to the screen rather than actually sending the email.  Copy the code below and paste and execute in a separate shell.  If you do not, the app is still fully functional, but there will be no test emails printed to screen.
@@ -7,8 +7,8 @@ The app is configured to use Python's built-in SMTP server which just prints the
 python3 -m smtpd -c DebuggingServer -n localhost:1025
 
 ## Dependencies
-pip install requests
-pip install selenium
+pip install requests\
+pip install selenium\
 pip install bs4
 
 The app also assumes that Google Chrome is installed in the default application directory for your operating system.  The Chrome webdriver must be downloaded and stored within the same directory as scraper.py.  The webdriver is required for Selenium and for scraping Amazon and Target's websites because Amazon is good at blocking HTML scrapers and Target is rendered in Javascript.  Go to the link below, download whichever webdriver is compatible with your version of Chrome and OS, unzip the download, then move the 'chromedriver' file to scraper.py's directory.

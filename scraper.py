@@ -35,12 +35,12 @@ def update_json(trackers, file = 'tracker.json'):
         json.dump(trackers, f, indent = 4)
 
 
-# spoof browser session
+# initiate browser session and retrieve and return webpage data
 def get_session(url):
     if "bestbuy.com" in url: # beautifulsoup is faster and headless so I prefer this method for compatible websites
         with open('headers.json') as file:
             data = json.load(file)
-        header = data[choice(list(data.keys()))] # random header picker -- originally used to circumvent amazon blocking, but that no longer works so I switched to Selenium
+        header = data[choice(list(data.keys()))] # random header picker -- originally used as a clever way to prevent amazon blocking scrape, but that no longer works so I switched to Selenium
         r = requests.Session()
         response = r.get(url, headers = header)
         page = BeautifulSoup(response.content, 'html.parser')
@@ -87,6 +87,7 @@ def start_msg(command, message, quit = False):
                 arrow_t = "  <--"
         else:   # if no products are saved we want to block v and t commands.
             c = 'a'
+            arrow_a = "  <--"
             m = alert_header + '    There are no product pages being tracked.  Add at least one product to execute "Remove Products" or "Track Price" commands.\n'
     elif c == 'a':
         arrow_a = "  <--"
