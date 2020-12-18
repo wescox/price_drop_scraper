@@ -43,10 +43,9 @@ def get_session(url):
         header = data[choice(list(data.keys()))] # random header picker -- originally used to circumvent amazon blocking, but that no longer works so I switched to Selenium
         r = requests.Session()
         response = r.get(url, headers = header)
-        page = BeautifulSoup(response.content, 'lxml')
+        page = BeautifulSoup(response.content, 'html')
     else: # selenium is used for target and amazon
-        if os.name == 'posix':
-            PATH = os.getcwd() + '/chromedriver'
+        PATH = os.getcwd() + driver
         page = webdriver.Chrome(PATH)
         page.get(url)
     return page
@@ -54,7 +53,7 @@ def get_session(url):
 
 # builds the different messages printed to screen for each command
 def start_msg(command, message, quit = False):
-    os.system('clear')
+    os.system(clear)
     c = command
     m = message   
     arrow_a = ''
@@ -112,32 +111,36 @@ def scrape(url, update = True):
     if http:
         retailer = url[url.find('.')+1:url.find('.com')] + '.com'
         print('\n' + alert_header + "    Processing...\n")
-        page = get_session(url)
-        dict = {'title': '', 'price': '', 'url': url}
         try:
-            if "target.com" in url:
-                price = page.find_element_by_xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]').text
-                dict['title'] = page.title
-                page.quit()
-            elif "amazon.com" in url:
-                try:
-                    price = page.find_element_by_id("priceblock_ourprice").text
-                except:
-                    price = page.find_element_by_id("priceblock_dealprice").text
-                dict['title'] = page.title
-                page.quit()
-            elif "bestbuy.com" in url:
-                price = page.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
-                dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
-            dict['price'] = float(price[1:])
-            if update:
-                trackers[retailer].append(dict)
-                update_json(trackers)
-                r = success_header + "    {} from {} is now being tracked.\n".format(dict['title'], retailer)
-            else:
-                r = dict['price']
+            page = get_session(url)
         except:
-            r = error_header + '    The URL is either not a product page or the scrape attempt failed due to technical issues.\n    Type h and press enter/return for more details.\n'
+            r = error_header + '    Configuration issue with Selenium or Beautiful Soup.\n    Make sure they\'re installed and that the "chromedriver" file is saved in the current directory.\n'
+        else:
+            dict = {'title': '', 'price': '', 'url': url}
+            try:
+                if "target.com" in url:
+                    price = page.find_element_by_xpath('/html/body/div[1]/div/div[5]/div/div[2]/div[2]/div[1]/div[1]/div[1]').text
+                    dict['title'] = page.title
+                    page.quit()
+                elif "amazon.com" in url:
+                    try:
+                        price = page.find_element_by_id("priceblock_ourprice").text
+                    except:
+                        price = page.find_element_by_id("priceblock_dealprice").text
+                    dict['title'] = page.title
+                    page.quit()
+                elif "bestbuy.com" in url:
+                    price = page.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
+                    dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
+                dict['price'] = float(price[1:])
+                if update:
+                    trackers[retailer].append(dict)
+                    update_json(trackers)
+                    r = success_header + "    {} from {} is now being tracked.\n".format(dict['title'], retailer)
+                else:
+                    r = dict['price']
+            except:
+                r = error_header + '    The URL is either not a product page or the scrape attempt failed due to technical issues.\n    Type h and press enter/return for more details.\n'
     else:
         r = error_header + '    Not a valid command or URL.  Needs to be a command from the list below or a complete URL including "http(s)://" and from compatible retailer.\n    Type h and press enter/return for more details.\n'
     return r
@@ -163,7 +166,7 @@ def tracker(ui):
             time.sleep(1)
         try:
             new_price = scrape(url, False)
-            m = '\n' + success_header + "    Last scrape: " + str(time.ctime()) + '\n'
+            m = success_header + "    Last scrape: " + str(time.ctime()) + '\n'
             if new_price < price_override:
                 drop = '{:.2f}'.format(price_override - new_price)
                 msg = "{} from {} dropped by ${}:\n{}".format(title, retailer, drop, url)
@@ -181,7 +184,6 @@ def tracker(ui):
 
 
 def view(ui):
-    error = False
     try: # need to test that user input was a valid number before we proceed.
         ui = int(ui)
         if ui < 1: # negatives aren't necessarily out of range so we need to catch those. 
@@ -189,8 +191,6 @@ def view(ui):
         title = tracker_list[ui-1][1]
     except:
         m =  error_header + "    Not a valid command or number option. Type h(v) and press enter/return for more details.\n"
-        # error = True
-    # if not error:
     else:
         sure = input("\nAre you sure you want to delete {}? (y/n):\n".format(title)).lower()
         if sure == 'y': # delete tracker and update json
@@ -256,7 +256,7 @@ def quit():
             start_msg(c, m)
             ui = input('Do you want to completely exit app and stop tracking (y) or choose a different command?: ').lower()
             if ui == 'y':
-                m = alert_header[1:] + '    App was closed and is no longer tracking product price changes.'
+                m = alert_header + '    App was closed and is no longer tracking product price changes.'
                 start_msg(c, m, True)
                 break # end loop and app stops running
             else:
@@ -270,7 +270,7 @@ def quit():
         if ui != 'y':
             commands(ui) # restarts app with new command
     except KeyboardInterrupt:
-        m = '\n' + alert_header[1:] + '    App was forced closed and is no longer tracking product price changes.'
+        m = alert_header + '    App was forced closed and is no longer tracking product price changes.'
         start_msg(c, m, True)
 
 
@@ -328,8 +328,8 @@ def help(command, h = False):
             "    Manually overrides 1 saved product's price with a higher price.  30 seconds later the app will scrape the URL again,\n"
             "    compare the current price with the higher override price, print a confirmation to the screen and then send a test email.\n"
             "    To test the email functionality a local SMTP server must be running.\n"
-            "    Copy/paste the command below in a seperate terminal/command prompt session.\n"
-            "    python3 -m smtpd -c DebuggingServer -n localhost:1025 (use sudo on Mac or Linux)\n"
+            "    Copy/paste the command below in a seperate terminal/command prompt session.\n\n"
+            "    python3 -m smtpd -c DebuggingServer -n localhost:1025\n\n"
             "    If the server is not running, all the other steps will still take place as described above.\n"
             "    There must be saved products in the tracker.json file to execute this command.\n"
             "    Once you are tracking, you must press the control key and the letter c key (^+c) to exit.  All other commands are ignored.\n" + tail
@@ -349,6 +349,14 @@ if __name__ == '__main__':
             trackers = json.load(file)
     except:
         update_json(trackers)
+
+# os dependencies
+    if os.name == 'posix':
+        clear = 'clear'
+        driver = '/chromedriver'
+    else:
+        clear =  'cls'
+        driver = '\\chromedriver'
 
 # globals
     tracker_list = []
