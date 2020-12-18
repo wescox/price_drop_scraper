@@ -43,7 +43,7 @@ def get_session(url):
         header = data[choice(list(data.keys()))] # random header picker -- originally used to circumvent amazon blocking, but that no longer works so I switched to Selenium
         r = requests.Session()
         response = r.get(url, headers = header)
-        page = BeautifulSoup(response.content, 'html')
+        page = BeautifulSoup(response.content, 'html.parser')
     else: # selenium is used for target and amazon
         PATH = os.getcwd() + driver
         page = webdriver.Chrome(PATH)
@@ -130,9 +130,11 @@ def scrape(url, update = True):
                     dict['title'] = page.title
                     page.quit()
                 elif "bestbuy.com" in url:
+                    with open('bestbuy.json', 'w') as f:
+                        json.dump(page, f, indent=4, default=str)
                     price = page.find(attrs = {'class':'priceView-hero-price priceView-customer-price'}).span.get_text()
                     dict['title'] = page.find(attrs = {'class':'sku-title'}).get_text()
-                dict['price'] = float(price[1:])
+                dict['price'] = float(price.replace(',','')[1:])
                 if update:
                     trackers[retailer].append(dict)
                     update_json(trackers)
@@ -140,9 +142,13 @@ def scrape(url, update = True):
                 else:
                     r = dict['price']
             except:
-                r = error_header + '    The URL is either not a product page or the scrape attempt failed due to technical issues.\n    Type h and press enter/return for more details.\n'
+                r = error_header + '    Was not able to find a price.  Either the URL is not a product page or product is no longer available.\n    Type h and press enter/return for more details.\n'
     else:
         r = error_header + '    Not a valid command or URL.  Needs to be a command from the list below or a complete URL including "http(s)://" and from compatible retailer.\n    Type h and press enter/return for more details.\n'
+    try:
+        page.quit()
+    except:
+        pass
     return r
 
 
